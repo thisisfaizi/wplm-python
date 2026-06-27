@@ -97,6 +97,32 @@ wplm = WplmClient(
 
 ---
 
+## Product Binding
+
+Set `product_id` and the SDK rejects any license whose signed product id (`pid`)
+does not match — so a key issued for another product cannot run in your app.
+Enforced **online and offline** from the cryptographically signed payload.
+
+```python
+from wplm import WplmClient, WplmProductMismatch
+
+wplm = WplmClient(
+    base_url="https://license.vendor.com",
+    product_id=42,             # this app only accepts product-42 keys
+    license_key=key,
+    public_key_base64=PUBLIC_KEY,
+)
+
+try:
+    wplm.validate(offline_ok=True)
+except WplmProductMismatch:
+    ...  # key belongs to a different product
+```
+
+Omit `product_id` to opt out (any genuine key is accepted). WooCommerce-issued
+keys carry their product id automatically; generator/API/CSV keys may need the
+admin **Settings → Tools → Re-sign licenses** backfill first.
+
 ## Subscription Renewal
 
 Renewals are handled through **WooCommerce My Account → Subscriptions → Renew**.

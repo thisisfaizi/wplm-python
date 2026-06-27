@@ -12,7 +12,14 @@ from typing import Any
 
 from .crypto import RevocationList, SignatureVerifier
 from .device_info import DeviceInfoProvider, WplmDeviceInfo
-from .errors import WplmApiError, WplmConfigError, WplmError, WplmNetworkError, WplmSignatureInvalid
+from .errors import (
+    WplmApiError,
+    WplmConfigError,
+    WplmError,
+    WplmNetworkError,
+    WplmProductMismatch,
+    WplmSignatureInvalid,
+)
 from .fingerprint import FingerprintProvider, PersistedUuidFingerprintProvider
 from .models import Machine, ValidationResult
 from .storage import InMemoryTokenStore, TokenStore
@@ -77,6 +84,17 @@ class WplmClient:
             result = ValidationResult.from_json(data)
             if result.signed_payload:
                 self._store.write(_K_SIGNED, result.signed_payload)
+            # Enforce product binding from the *signed* payload (not the unsigned
+            # license JSON), so a key issued for another product is rejected even
+            # online. No-op when product_id is None.
+            if result.valid and self.product_id is not None:
+                if not result.signed_payload:
+                    raise WplmProductMismatch(
+                        "License is valid but carries no signed payload to verify "
+                        f"product binding for product {self.product_id}.",
+                        code="product_mismatch",
+                    )
+                self._enforce_product_id(self._verify_with_key_refresh(result.signed_payload))
             # A successful online call is a trusted clock reading — advance the
             # monotonic time floor so a later offline rollback is detectable.
             self._advance_time_floor(int(time.time()))
@@ -163,6 +181,41 @@ class WplmClient:
 
     # -------------------------------------------------------------- offline
 
+    def _verify_with_key_refresh(self, token: str) -> dict[str, Any]:
+        """Verify ``token`` online, recovering from server keypair rotation.
+
+        If the cached public key fails verification, drop it, re-fetch
+        ``/public-key`` once, and retry. This self-heals clients that cached an
+        old public key before the vendor rotated the signing keypair.
+        """
+        try:
+            return self._get_verifier().verify(token)
+        except WplmSignatureInvalid:
+            # Cached key may be stale — invalidate and re-fetch once.
+            self._verifier = None
+            self._store.delete(_K_PUBKEY)
+            return self._get_verifier().verify(token)
+
+    def _enforce_product_id(self, payload: dict[str, Any]) -> None:
+        """Reject a signed payload whose product binding does not match.
+
+        No-op when ``product_id`` is None (the app opted out of product binding).
+        When set, the payload's signed ``pid`` must equal it; a missing or
+        different ``pid`` raises :class:`WplmProductMismatch`. Enforced from the
+        signed payload so the rule holds identically online and offline.
+        """
+        expected = self.product_id
+        if expected is None:
+            return
+        pid = payload.get("pid")
+        actual = int(pid) if isinstance(pid, (int, float)) else None
+        if actual != expected:
+            raise WplmProductMismatch(
+                f"License is bound to product {actual if actual is not None else 'none'}, "
+                f"but this app is configured for product {expected}.",
+                code="product_mismatch",
+            )
+
     def _validate_offline(self, key: str) -> ValidationResult | None:
         token = self._store.read(_K_SIGNED)
         if not token:
@@ -176,6 +229,10 @@ class WplmClient:
             payload = verifier.verify(token)
         except WplmSignatureInvalid:
             return ValidationResult(valid=False, code="signature_invalid", from_cache=True)
+
+        # Product binding is enforced offline too: the signed ``pid`` must match
+        # the configured product_id. No-op when product_id is None.
+        self._enforce_product_id(payload)
 
         if not SignatureVerifier.is_within_clock_drift(payload, self.max_clock_drift):
             return ValidationResult(valid=False, code="clock_drift", from_cache=True)

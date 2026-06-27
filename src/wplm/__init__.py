@@ -19,6 +19,7 @@ from .errors import (
     WplmNetworkError,
     WplmNotActive,
     WplmNotFound,
+    WplmProductMismatch,
     WplmRevoked,
     WplmSignatureInvalid,
     WplmSuspended,
@@ -33,7 +34,7 @@ from .models import License, Machine, ValidationResult
 from .storage import FileTokenStore, InMemoryTokenStore, TokenStore
 from .transport import RequestsTransport, Response, Transport
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "DeviceInfoProvider",
@@ -64,6 +65,7 @@ __all__ = [
     "WplmNetworkError",
     "WplmNotActive",
     "WplmNotFound",
+    "WplmProductMismatch",
     "WplmRevoked",
     "WplmSignatureInvalid",
     "WplmSuspended",

@@ -13,6 +13,7 @@ from wplm import (
     WplmDeviceInfo,
     WplmLimitExceeded,
     WplmNetworkError,
+    WplmProductMismatch,
 )
 from wplm.transport import Response
 
@@ -276,3 +277,173 @@ def test_explicit_activate_args_override_device_info() -> None:
 
     sent = json.loads(transport.calls[-1][2] or "{}")
     assert sent["name"] == "Custom"
+
+
+# --------------------------------------------------------------- product binding
+
+
+def _signed_with_pid(pid: int | None) -> tuple[str, str]:
+    signer = TestSigner()
+    token = signer.sign(
+        {
+            "key": "KEY",
+            "expires": "2099-01-01T00:00:00Z",
+            "max": 3,
+            "pid": pid,
+            "iat": int(time.time()),
+        }
+    )
+    return token, signer.public_key_base64
+
+
+def _online_validate_handler(token: str):
+    def handler(method: str, url: str, body: str | None) -> Response:
+        if url.endswith("/validate"):
+            return Response(
+                200,
+                success_body(
+                    {
+                        "valid": True,
+                        "license": {"id": 1, "status": 1},
+                        "signed_payload": token,
+                        "needs_activation": False,
+                    }
+                ),
+            )
+        return Response(200, success_body({"crl": ""}))
+
+    return handler
+
+
+def test_online_matching_pid_passes() -> None:
+    token, pubkey = _signed_with_pid(42)
+    client = WplmClient(
+        base_url="https://example.test",
+        license_key="KEY",
+        product_id=42,
+        public_key_base64=pubkey,
+        transport=FakeTransport(_online_validate_handler(token)),
+        store=InMemoryTokenStore(),
+    )
+
+    assert client.validate().valid is True
+
+
+def test_online_mismatched_pid_raises() -> None:
+    token, pubkey = _signed_with_pid(99)
+    client = WplmClient(
+        base_url="https://example.test",
+        license_key="KEY",
+        product_id=42,
+        public_key_base64=pubkey,
+        transport=FakeTransport(_online_validate_handler(token)),
+        store=InMemoryTokenStore(),
+    )
+
+    with pytest.raises(WplmProductMismatch):
+        client.validate()
+
+
+def test_offline_matching_pid_passes() -> None:
+    token, pubkey = _signed_with_pid(42)
+    store = InMemoryTokenStore()
+    store.write("wplm.signed_payload", token)
+    client = WplmClient(
+        base_url="https://example.test",
+        license_key="KEY",
+        product_id=42,
+        public_key_base64=pubkey,
+        transport=FakeTransport(_offline),
+        store=store,
+    )
+
+    result = client.validate(offline_ok=True)
+    assert result.valid is True
+    assert result.from_cache is True
+
+
+def test_offline_mismatched_pid_raises() -> None:
+    token, pubkey = _signed_with_pid(99)
+    store = InMemoryTokenStore()
+    store.write("wplm.signed_payload", token)
+    client = WplmClient(
+        base_url="https://example.test",
+        license_key="KEY",
+        product_id=42,
+        public_key_base64=pubkey,
+        transport=FakeTransport(_offline),
+        store=store,
+    )
+
+    with pytest.raises(WplmProductMismatch):
+        client.validate(offline_ok=True)
+
+
+def test_offline_missing_pid_with_product_id_raises() -> None:
+    token, pubkey = _signed_with_pid(None)  # legacy token, no pid
+    store = InMemoryTokenStore()
+    store.write("wplm.signed_payload", token)
+    client = WplmClient(
+        base_url="https://example.test",
+        license_key="KEY",
+        product_id=42,
+        public_key_base64=pubkey,
+        transport=FakeTransport(_offline),
+        store=store,
+    )
+
+    with pytest.raises(WplmProductMismatch):
+        client.validate(offline_ok=True)
+
+
+def test_no_product_id_skips_pid_check() -> None:
+    token, pubkey = _signed_with_pid(None)  # legacy token, no pid
+    store = InMemoryTokenStore()
+    store.write("wplm.signed_payload", token)
+    client = WplmClient(
+        base_url="https://example.test",
+        license_key="KEY",
+        # product_id intentionally omitted = opt out
+        public_key_base64=pubkey,
+        transport=FakeTransport(_offline),
+        store=store,
+    )
+
+    assert client.validate(offline_ok=True).valid is True
+
+
+def test_online_recovers_from_rotated_key() -> None:
+    # The token is signed by the CURRENT key, but the store holds a STALE key
+    # from a previous keypair. Online validate must drop it, refetch, and retry.
+    token, good_pubkey = _signed_with_pid(42)
+    stale = TestSigner()  # a different keypair
+    store = InMemoryTokenStore()
+    store.write("wplm.public_key", stale.public_key_base64)
+
+    def handler(method: str, url: str, body: str | None) -> Response:
+        if url.endswith("/validate"):
+            return Response(
+                200,
+                success_body(
+                    {
+                        "valid": True,
+                        "license": {"id": 1, "status": 1},
+                        "signed_payload": token,
+                        "needs_activation": False,
+                    }
+                ),
+            )
+        if url.endswith("/public-key"):
+            return Response(200, success_body({"public_key": good_pubkey}))
+        return Response(200, success_body({"crl": ""}))
+
+    client = WplmClient(
+        base_url="https://example.test",
+        license_key="KEY",
+        product_id=42,
+        # public_key_base64 intentionally omitted so it reads the stale store key
+        transport=FakeTransport(handler),
+        store=store,
+    )
+
+    assert client.validate().valid is True

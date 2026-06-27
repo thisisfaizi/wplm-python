@@ -39,6 +39,7 @@ class WplmError(Exception):
             "license_not_active": WplmNotActive,
             "machine_not_found": WplmMachineNotFound,
             "machine_inactive": WplmMachineNotFound,
+            "product_mismatch": WplmProductMismatch,
         }
         cls = mapping.get(code, WplmApiError)
         return cls(message, code=code, status=status)
@@ -78,6 +79,15 @@ class WplmNotActive(WplmError):
 
 class WplmMachineNotFound(WplmError):
     """The device/machine was not found or is inactive."""
+
+
+class WplmProductMismatch(WplmError):
+    """The license is bound to a different product than this client expects.
+
+    Raised when the signed payload's ``pid`` does not match the configured
+    ``product_id``. Enforced online and offline from the cryptographically
+    signed payload, so a key issued for product A cannot run in product B's app.
+    """
 
 
 class WplmApiError(WplmError):
