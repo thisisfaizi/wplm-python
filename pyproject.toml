@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "wplm"
+version = "0.1.0"
+description = "Official Python SDK for WP License Manager (WPLM) — validate, activate, and verify software licenses online and offline."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "WPLM Contributors" }]
+keywords = ["licensing", "drm", "cryptography", "authentication", "wordpress"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Libraries",
+  "Typing :: Typed",
+]
+dependencies = ["requests>=2.31", "PyNaCl>=1.5"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "mypy>=1.10", "ruff>=0.5", "types-requests", "responses>=0.25"]
+
+[project.urls]
+Homepage = "https://github.com/wplm/wplm-python"
+Repository = "https://github.com/wplm/wplm-python"
+Issues = "https://github.com/wplm/wplm-python/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/wplm"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
