@@ -2,16 +2,15 @@
 
 <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=12,18,25&height=160&section=header&text=wplm-python&fontSize=50&fontAlignY=42&animation=fadeIn&fontColor=ffffff" />
 
-### WP License Manager — Python SDK
+# WP License Manager — Python SDK
 
-[![PyPI](https://img.shields.io/pypi/v/wplm?style=for-the-badge&logo=pypi&logoColor=white&color=3776AB)](https://pypi.org/project/wplm/)
-[![CI](https://img.shields.io/github/actions/workflow/status/wplm/wplm-python/ci.yaml?style=for-the-badge&label=CI&logo=github-actions&logoColor=white)](https://github.com/thisisfaizi/wplm-python/actions/workflows/ci.yaml)
-[![Coverage](https://img.shields.io/codecov/c/github/wplm/wplm-python?style=for-the-badge&logo=codecov&logoColor=white)](https://codecov.io/gh/wplm/wplm-python)
+[![CI](https://img.shields.io/github/actions/workflow/status/thisisfaizi/wplm-python/ci.yaml?style=for-the-badge&label=CI&logo=github-actions&logoColor=white)](https://github.com/thisisfaizi/wplm-python/actions/workflows/ci.yaml)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 
-<p>Offline-first Ed25519 license validation for Python desktop apps, CLIs, and servers,<br>
-backed by a self-hosted <a href="https://github.com/thisisfaizi/wp-license-manager">WP License Manager</a> server.</p>
+<p>Python SDK for WP License Manager — activate, validate and verify Ed25519-signed software license keys<br>
+offline in Python desktop apps, CLIs and servers. Backed by a self-hosted<br>
+<a href="https://github.com/thisisfaizi/wp-license-manager">WP License Manager</a> software licensing server for WordPress / WooCommerce.</p>
 
 </div>
 
@@ -32,9 +31,13 @@ from desktop apps (PyQt/Tk), CLIs, scripts, and servers on Windows, macOS, and L
 
 ## Install
 
+> Not yet published to PyPI; install from GitHub for now.
+
 ```bash
-pip install wplm
+pip install git+https://github.com/thisisfaizi/wplm-python
 ```
+
+Requires Python 3.10+.
 
 ---
 
@@ -168,7 +171,6 @@ pytest
 - [Dart / Flutter SDK](https://github.com/thisisfaizi/wplm-dart)
 - [PHP SDK](https://github.com/thisisfaizi/wplm-php)
 - [JavaScript / TypeScript SDK](https://github.com/thisisfaizi/wplm-js)
-- [OpenAPI 3.1 spec](https://github.com/thisisfaizi/wplm-openapi)
 
 ---
 
